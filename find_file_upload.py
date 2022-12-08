@@ -1,5 +1,15 @@
-# Created by Armel Alcera - Twitter @alcrmel
+# Created by Armel Alcera - 
+# Socials:
+#    Twitter  - @alcrmel
+#    Linkedin - https://www.linkedin.com/in/armelalcera/
 # 
+
+"""
+Passive scan rules should not make any requests.
+
+Note that new passive scripts will initially be disabled
+Right click the script in the Scripts tree and select "enable"
+"""  
 
 import re
 from org.zaproxy.zap.extension.pscan import PluginPassiveScanner;
@@ -29,7 +39,7 @@ def scan(ps, msg, src):
     """  
     
     # Regex for Locating a file upload form
-    formRegex = """(type\s*=\s*['"]?file['"]?)"""
+    formRegex = """<input[^>]*type=['"]?file['"]?[^>]*(\/)?>"""
     
   
     # Test the request and/or response here
@@ -41,25 +51,32 @@ def scan(ps, msg, src):
         # risk: 0: info, 1: low, 2: medium, 3: high
         # confidence: 0: false positive, 1: low, 2: medium, 3: high
         
-        alertTitle = 'Script: File upload field'
+        alertName = 'Script: File Upload Found'
         alertDescription = 'Uploaded files represent a significant risk to applications. The first step in many attacks is to get some code to the system to be attacked. Then the attack only needs to find a way to get the code executed. Using a file upload helps the attacker accomplish the first step'
-        alertSolution = 'Fully protecting against malicious file upload can be complex, and the exact steps required will vary depending on the types files that are uploaded, and how the files are processed or parsed on the server. '
+        alertSolution = 'Fully protecting against malicious file upload can be complex, and the exact steps required will vary depending on the types files that are uploaded, and how the files are processed or parsed on the server.\n\nIdentifying where all the upload functionalities are in the web application and inspecting whether they only accept files based on their functionality will help increase the security of the application.'
         alertReference = 'https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/10-Business_Logic_Testing/09-Test_Upload_of_Malicious_Files'
+        alertUri = msg.getRequestHeader().getURI().toString()
      
         # Get the responseBody to be parsed
         responseBody = msg.getResponseBody().toString()
-        
+
+        # Identify the file upload tags in the response body
         form_found = re.search(formRegex, responseBody)
     
-    
-        # Docs on alert raising function:
-        #  raiseAlert(int risk, int confidence, str name, str description, str uri,
-        #             str param, str attack, str otherInfo, str solution,
-        #             str evidence, int cweId, int wascId, HttpMessage msg)
-        #  risk: 0: info, 1: low, 2: medium, 3: high
-        #  confidence: 0: falsePositive, 1: low, 2: medium, 3: high, 4: confirmed
+        # If a tag was identified, this if statement will trigger
+        # and will create an alert
         if form_found:
-            print(form_found.group(0))
-            ps.raiseAlert(1, 2, alertTitle, alertDescription, 
-                msg.getRequestHeader().getURI().toString(), 
-                '', '', alertReference, alertSolution, form_found.group(0), 434, 0, msg);
+            
+            alertObj = ps.newAlert()
+            
+            alertObj.setRisk(0)
+            alertObj.setConfidence(3)
+            alertObj.setName(alertName)
+            alertObj.setDescription(alertDescription)
+            alertObj.setReference(alertReference)
+            alertObj.setSolution(alertSolution)
+            alertObj.setUri(alertUri)
+            alertObj.setEvidence(form_found.group(0))
+            alertObj.setMessage(msg)
+            alertObj.setWascId(13)
+            alertObj.raise()
